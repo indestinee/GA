@@ -12,10 +12,14 @@
 #include <bits/stdc++.h>
 using namespace std;
 #endif
+#include <thread>
 
 typedef vector<int> Gene;
-
+const int MUTATION_TIMES = 5, THREAD_NUM = 16;
 const long long RAND2_MAX = 1LL << 62;
+const bool TSP = true;
+thread t[THREAD_NUM];
+
 inline long long rand2() {
     return ((long long) rand()) << 31 | rand();
 }
@@ -25,8 +29,16 @@ inline double random(const double &l, const double &r) {
 }
 
 inline void mutation(Gene &new_gene) {
+    for (int i = 0; i < MUTATION_TIMES; i++) {
+        int n = new_gene.size(), a = rand() % n, b = rand() % n;
+        swap(new_gene[a], new_gene[b]);
+    }
+}
+
+inline void reverse(Gene &new_gene) {
     int n = new_gene.size(), a = rand() % n, b = rand() % n;
-    swap(new_gene[a], new_gene[b]);
+    if (a > b) swap(a, b);
+    reverse(new_gene.begin() + a, new_gene.begin() + ++b);
 }
 
 inline void print(const Gene &gene) {
@@ -42,7 +54,7 @@ struct Life{
     Life() { }
     Life (const Gene &gene) : gene(gene), score(-1) { }
     inline void out() {
-        print(gene);
+        /* print(gene); */
         printf("Score = %.10f, dis = %.10f\n\n", score, 1.0 / score);
     }
     inline friend bool operator < (const Life &a, const Life &b) {
@@ -117,28 +129,63 @@ struct Config{
     ) : corss_rate(corss_rate), mutation_rate(mutation_rate), \
         life_cnt(life_cnt), gene_len(gene_len), fun(fun) { }
 };
-
+class GA;
+inline void work(GA *ga, const int &first);
 class GA{
+public:
     vector<Life> lives;
+    vector<Life> children;
     Life *best;
-    Config config;
     double sum;
     int generation;
+    Config config;
 private:
-    inline void init_population() {
+    inline void load(string s) {
+        if (s == "") 
+            return;
+        ifstream fin;
+        fin.open(s.c_str(), ios_base::binary);
+        if (fin.is_open()) {
+            int each = lives[0].gene.size() * sizeof(int), n = lives.size();
+            char *data = (char *) malloc(each * n); 
+            fin.read(data, n * each);
+            /* printf("Read %d * %d Byte..\n", each, n); */
+            for (int i = 0; i < n; i++)
+                memcpy(lives[i].gene.data(), data + i * each, each);
+        } else {
+            printf("Open %s failed..\n", s.c_str());
+        }
+    }
+    inline void init_population(string s) {
+        children.resize(config.life_cnt);
         generation = 0;
         lives.clear();
         Gene gene(config.gene_len);
         for (int i = 0; i < config.gene_len; i++)
             gene[i] = i;
         for (int i = 0; i < config.life_cnt; i++) {
-            random_shuffle(gene.begin(), gene.end());
             lives.push_back(Life(gene));
+            random_shuffle(gene.begin(), gene.end());
         }
+        load(s);
     }
 public:
-    GA(const Config &config) : config(config) {
-        init_population();
+    void save(string s = "save.bin") {
+        ofstream fout;
+        fout.open(s.c_str(), ios_base::binary);
+        if (!fout.is_open()) {
+            puts("[ERR] Open data.bin failed");
+            exit(-1);
+        }
+        int each = lives[0].gene.size() * sizeof(int), n = lives.size();
+        char *data = (char *) malloc(each * n); 
+        for (int i = 0; i < n; i++)
+            memcpy(data + i * each, lives[i].gene.data(), each);
+        /* printf("Dump %d * %d Byte..\n", each, n); */
+        fout.write(data, n * each);
+    }
+    GA(const Config &config, const string &s = "") : config(config) {
+        init_population(s);
     }
     inline Life leader() {
         estimate();
@@ -186,19 +233,24 @@ public:
         rate = random(0, 1);
         if (rate < config.mutation_rate)
             mutation(gene);
+        if (random(0, 1) < 0.5)
+            reverse(gene);
         return Life(gene);
     }
-
+    
     inline void next_generation() {
         estimate();
-        vector<Life> children(config.life_cnt);
+        sort(lives.begin(), lives.end());
         children[0] = *best;
-        int cnt = 1;
-        while (cnt < config.life_cnt)
-            children[cnt++] = multiply();
         
-        if (1) {
-            sort(lives.begin(), lives.end());
+        /* while (cnt < config.life_cnt) */ 
+            /* children[cnt++] = multiply(); */
+        for (int i = 0; i < THREAD_NUM; i++)
+            t[i] = thread(work, this, i + 1);
+        for (int i = 0; i < THREAD_NUM; i++)
+            t[i].join();
+        
+        if (TSP) {
             sort(children.begin(), children.end());
             int half = config.life_cnt >> 1;
             for (int i = half; i < config.life_cnt; i++)
@@ -213,3 +265,8 @@ public:
 };
 
 
+inline void work(GA *ga, const int &first) {
+    for (int i = first; i < ga->config.life_cnt; i += THREAD_NUM) {
+        ga->children[i] = ga->multiply();
+    }
+}
