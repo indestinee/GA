@@ -138,6 +138,7 @@ public:
         init_population();
     }
     inline Life leader() {
+        estimate();
         return *best;
     }
     inline void out() {
