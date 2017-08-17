@@ -43,7 +43,10 @@ struct Life{
     Life (const Gene &gene) : gene(gene), score(-1) { }
     inline void out() {
         print(gene);
-        printf("Score = %.10f\n\n", score);
+        printf("Score = %.10f, dis = %.10f\n\n", score, 1.0 / score);
+    }
+    inline friend bool operator < (const Life &a, const Life &b) {
+        return a.score > b.score;
     }
 };
 
@@ -193,10 +196,20 @@ public:
         int cnt = 1;
         while (cnt < config.life_cnt)
             children[cnt++] = multiply();
-        lives.clear();
-        lives = children;
+        
+        if (1) {
+            sort(lives.begin(), lives.end());
+            sort(children.begin(), children.end());
+            int half = config.life_cnt >> 1;
+            for (int i = half; i < config.life_cnt; i++)
+                lives[i] = children[i - half];
+        } else {
+            lives.clear();
+            lives = children;
+        }
         generation++;
     }
     
 };
+
 
