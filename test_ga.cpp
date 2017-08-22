@@ -35,7 +35,7 @@ double dist(const int &a, const int &b) {
     return dist(v[a], v[b]);
 }
 
-double fun(Life a) {
+double fun(Life &a) {
     double ret = 0;
     for (int i = 1; i < int(a.gene.size()); i++) {
         ret += dist(a.gene[i], a.gene[i - 1]);

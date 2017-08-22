@@ -14,41 +14,42 @@ using namespace std;
 #endif
 #include <thread>
 
+
 typedef vector<int> Gene;
-const int MUTATION_TIMES = 5, THREAD_NUM = 16;
+typedef unsigned long long U64;
+typedef long double LD;
+
+const int MUTATION_TIMES = 1, THREAD_NUM = 16, RAND_MAX_BITS = 31;
 const long long RAND2_MAX = 1LL << 62;
-const bool TSP = true;
+const bool FITTEST = true;
 thread t[THREAD_NUM];
 
-inline long long rand2() {
-    return ((long long) rand()) << 31 | rand();
-}
+inline U64 rand2() {/*{{{*/
+    return (U64(rand())) << RAND_MAX_BITS | rand();
+}/*}}}*/
+inline LD random(const LD &l, const LD &r) {/*{{{*/
+    return LD(rand2()) / LD(RAND2_MAX) * (r - l) + l;
+}/*}}}*/
 
-inline double random(const double &l, const double &r) {
-    return ((double) rand2()) / (double) RAND2_MAX * (r - l) + l;
-}
-
-inline void mutation(Gene &new_gene) {
+inline void mutation(Gene &new_gene) {/*{{{*/
     for (int i = 0; i < MUTATION_TIMES; i++) {
         int n = new_gene.size(), a = rand() % n, b = rand() % n;
         swap(new_gene[a], new_gene[b]);
     }
-}
-
-inline void reverse(Gene &new_gene) {
+}/*}}}*/
+inline void reverse(Gene &new_gene) {/*{{{*/
     int n = new_gene.size(), a = rand() % n, b = rand() % n;
     if (a > b) swap(a, b);
     reverse(new_gene.begin() + a, new_gene.begin() + ++b);
-}
-
-inline void print(const Gene &gene) {
+}/*}}}*/
+inline void print(const Gene &gene) {/*{{{*/
     printf("Gene: ");
     int m = gene.size();
     for (int i = 0; i < m; i++)
         printf("%d%c", gene[i], (i + 1 == m) ? '\n' : ' ');
-}
+}/*}}}*/
 
-struct Life{
+struct Life{/*{{{*/
     Gene gene;
     double score;
     Life() { }
@@ -60,13 +61,12 @@ struct Life{
     inline friend bool operator < (const Life &a, const Life &b) {
         return a.score > b.score;
     }
-};
+};/*}}}*/
 
-inline void print(Life a) {
+inline void print(Life a) {/*{{{*/
     a.out();
-}
-
-inline void cross(const Life &father, const Life &mother, Gene &new_gene) {
+}/*}}}*/
+inline void cross(const Life &father, const Life &mother, Gene &new_gene) {/*{{{*/
     new_gene = father.gene;
     int n = new_gene.size(), a = rand() % n, b = rand() % n;
     if (a > b)
@@ -92,46 +92,26 @@ inline void cross(const Life &father, const Life &mother, Gene &new_gene) {
         if (s.find(new_gene[i]) != s.end())
             new_gene[i] = f[p++];
     }
-
-/*
-    cout << a << " " << b << endl;
-    print(father);
-    print(mother);
-    print(new_gene);
-    if (p != cnt) {
-        printf("p = %d != %d = cnt\n", p, cnt);
-        exit(-1);
-    }
-    s.clear();
-    for (int i = 0; i < n; i++) {
-        if (s.find(new_gene[i]) != s.end()) {
-            printf("find %d twice!\n", new_gene[i]);
-            exit(-1);
-        }
-        s.insert(new_gene[i]);
-    }
-*/
-
-}   
+}   /*}}}*/
 
 
-struct Config{
+struct Config{/*{{{*/
     double corss_rate, mutation_rate;
     int life_cnt, gene_len;
-    double (*fun) (Life);
+    double (*fun) (Life&);
     Config () { }
     Config (
         const double &corss_rate,
         const double &mutation_rate,
         const int &life_cnt,
         const int &gene_len,
-        double (*const fun) (Life)
+        double (*const fun) (Life&)
     ) : corss_rate(corss_rate), mutation_rate(mutation_rate), \
         life_cnt(life_cnt), gene_len(gene_len), fun(fun) { }
-};
+};/*}}}*/
 class GA;
 inline void work(GA *ga, const int &first);
-class GA{
+class GA{/*{{{*/
 public:
     vector<Life> lives;
     vector<Life> children;
@@ -164,8 +144,8 @@ private:
         for (int i = 0; i < config.gene_len; i++)
             gene[i] = i;
         for (int i = 0; i < config.life_cnt; i++) {
-            lives.push_back(Life(gene));
             random_shuffle(gene.begin(), gene.end());
+            lives.push_back(Life(gene));
         }
         load(s);
     }
@@ -250,11 +230,13 @@ public:
         for (int i = 0; i < THREAD_NUM; i++)
             t[i].join();
         
-        if (TSP) {
+        if (FITTEST) {
             sort(children.begin(), children.end());
-            int half = config.life_cnt >> 1;
+            int half = config.life_cnt * 0.45;
             for (int i = half; i < config.life_cnt; i++)
                 lives[i] = children[i - half];
+            for (int i = config.life_cnt * 0.9; i < config.life_cnt; i++)
+                random_shuffle(lives[i].gene.begin(), lives[i].gene.end());
         } else {
             lives.clear();
             lives = children;
@@ -262,7 +244,7 @@ public:
         generation++;
     }
     
-};
+};/*}}}*/
 
 
 inline void work(GA *ga, const int &first) {
